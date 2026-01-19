@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     host: true, 
     port: 5173,
-    strictPort: true, // Ép chạy đúng port 5173 để Ngrok không bị mất kết nối
+    strictPort: true, 
     allowedHosts: 'all', 
     
     proxy: {
@@ -14,14 +14,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
         secure: false,
-        // Chỉ rewrite nếu Backend của bạn KHÔNG dùng tiền tố /api
-        // Nếu Backend của bạn có router.get('/api/settings'), hãy xóa dòng rewrite dưới đây
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // PHẢI MỞ DÒNG NÀY: Để nó xóa bớt chữ /api thừa khi gọi từ Frontend
+        rewrite: (path) => path.replace(/^\/api/, ''), 
       },
     },
-    // Giúp tránh lỗi trang trắng khi thay đổi code (Hot Module Replacement)
     hmr: {
-      clientPort: 443, // Quan trọng khi dùng Ngrok HTTPS
+      clientPort: 443, 
     },
   }
 })

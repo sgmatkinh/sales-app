@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; 
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FiMenu } from "react-icons/fi";
 
@@ -9,21 +9,43 @@ import Customers from "./pages/Customers";
 import Invoice from "./pages/Invoice";
 import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
+import Login from "./pages/Login"; 
 
 export default function App() {
   const [open, setOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // --- LOGIC KIỂM TRA ĐĂNG NHẬP ---
+  useEffect(() => {
+    const auth = localStorage.getItem("isLoggedIn");
+    if (auth === "true") {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  // --- HÀM ĐĂNG XUẤT (TRUYỀN XUỐNG SIDEBAR) ---
+  const handleLogout = () => {
+    if (window.confirm("Bạn có chắc chắn muốn đăng xuất không?")) {
+      localStorage.removeItem("isLoggedIn");
+      setIsLoggedIn(false);
+    }
+  };
+
+  // Nếu chưa đăng nhập, hiện trang Login
+  if (!isLoggedIn) {
+    return <Login onLoginSuccess={() => setIsLoggedIn(true)} />;
+  }
 
   return (
     <BrowserRouter>
       <div className="flex min-h-screen bg-gray-50">
-        {/* Sidebar: Truyền cả open và setOpen xuống */}
-        <Sidebar open={open} setOpen={setOpen} />
+        {/* Sidebar: Truyền thêm hàm onLogout xuống */}
+        <Sidebar open={open} setOpen={setOpen} onLogout={handleLogout} />
 
         {/* Main content */}
-        {/* Sửa md:ml-64 thành md:ml-72 để khớp với độ rộng w-72 của Sidebar */}
         <div className="flex-1 flex flex-col md:ml-72 transition-all duration-300">
           
-          {/* Header (Chỉ hiện trên mobile) */}
+          {/* Header (Mobile) */}
           <div className="sticky top-0 z-30 bg-white shadow-sm p-4 flex items-center md:hidden">
             <button 
               className="p-2 hover:bg-gray-100 rounded-lg"
@@ -36,7 +58,7 @@ export default function App() {
             </span>
           </div>
 
-          {/* Nội dung trang: Thêm overflow-x-hidden để không bị xê dịch ngang trên mobile */}
+          {/* Nội dung trang */}
           <div className="p-4 md:p-8 overflow-x-hidden">
             <Routes>
               <Route path="/" element={<Dashboard />} />

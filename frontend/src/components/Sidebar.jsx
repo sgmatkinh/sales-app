@@ -6,11 +6,12 @@ import {
   FiUsers,
   FiFileText,
   FiSettings,
-  FiX, // Thêm icon đóng
+  FiX,
+  FiLogOut, // Thêm icon đăng xuất
 } from "react-icons/fi";
 
-// Thêm props setOpen để có thể đóng sidebar từ bên trong
-export default function Sidebar({ open, setOpen }) {
+// Nhận thêm prop onLogout từ App.jsx truyền xuống
+export default function Sidebar({ open, setOpen, onLogout }) {
   const [config, setConfig] = useState({
     themeColor: "#2563eb",
     logoUrl: "",
@@ -25,7 +26,7 @@ export default function Sidebar({ open, setOpen }) {
 
   return (
     <>
-      {/* 1. LỚP NỀN MỜ (OVERLAY) - Chỉ hiện trên mobile khi sidebar mở */}
+      {/* 1. LỚP NỀN MỜ (OVERLAY) */}
       {open && (
         <div 
           className="fixed inset-0 bg-black/50 z-[40] md:hidden"
@@ -70,7 +71,6 @@ export default function Sidebar({ open, setOpen }) {
 
         {/* NAVIGATION MENU */}
         <nav className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-          {/* Truyền thêm hàm setOpen vào Menu để bấm là đóng sidebar */}
           <Menu to="/" icon={FiHome} label="Dashboard" closeMenu={() => setOpen(false)} />
           <Menu to="/products" icon={FiBox} label="Sản phẩm" closeMenu={() => setOpen(false)} />
           <Menu to="/customers" icon={FiUsers} label="Khách hàng" closeMenu={() => setOpen(false)} />
@@ -79,7 +79,22 @@ export default function Sidebar({ open, setOpen }) {
           <Menu to="/settings" icon={FiSettings} label="Cài đặt" closeMenu={() => setOpen(false)} />
         </nav>
 
-        <div className="pt-6 border-t border-white/10 text-center">
+        {/* PHẦN ĐĂNG XUẤT (MỚI THÊM) */}
+        <div className="pt-4 border-t border-white/10 mt-4">
+          <button
+            onClick={() => {
+              setOpen(false); // Đóng sidebar trên mobile trước khi đăng xuất
+              onLogout();     // Gọi hàm đăng xuất từ App.jsx
+            }}
+            className="flex items-center gap-4 w-full p-4 rounded-2xl transition-all duration-300 font-black text-base hover:bg-red-500/20 text-white hover:translate-x-2"
+          >
+            <FiLogOut size={22} strokeWidth={2.5} className="text-red-300" />
+            Đăng xuất
+          </button>
+        </div>
+
+        {/* FOOTER */}
+        <div className="pt-4 text-center">
           <p className="text-[10px] font-medium opacity-70 uppercase tracking-widest">
             © 2026 Mắt Kính Sài Gòn
           </p>
@@ -89,12 +104,12 @@ export default function Sidebar({ open, setOpen }) {
   );
 }
 
-// Sửa lại Component Menu để nhận hàm closeMenu
+// Component Menu con
 function Menu({ to, icon: Icon, label, closeMenu }) {
   return (
     <NavLink
       to={to}
-      onClick={closeMenu} // Bấm vào link là đóng Sidebar ngay (trên mobile)
+      onClick={closeMenu}
       className={({ isActive }) =>
         `flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 font-black text-base
         ${isActive 
