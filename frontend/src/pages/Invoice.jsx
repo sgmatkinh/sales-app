@@ -10,24 +10,47 @@ export default function Invoice() {
   const [products, setProducts] = useState([]);
   const [allCustomers, setAllCustomers] = useState([]);
   const [search, setSearch] = useState("");
-  const [cart, setCart] = useState([]);
   const [showSuggest, setShowSuggest] = useState(false);
   const [showCustSuggest, setShowCustSuggest] = useState(false);
   const [showNameSuggest, setShowNameSuggest] = useState(false);
-  const [customer, setCustomer] = useState({ name: "", phone: "" });
-  const [note, setNote] = useState("");
-  const [orderDiscount, setOrderDiscount] = useState(0);
-  const [discountType, setDiscountType] = useState("money");
-  
-  // MỚI: Thêm state lưu ngày giờ (mặc định là hiện tại)
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 16));
+
+  // --- PHẦN CHỈNH SỬA: KHỞI TẠO STATE TỪ LOCALSTORAGE ---
+  const [cart, setCart] = useState(() => {
+    const saved = localStorage.getItem("draft_cart");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customer, setCustomer] = useState(() => {
+    const saved = localStorage.getItem("draft_customer");
+    return saved ? JSON.parse(saved) : { name: "", phone: "" };
+  });
+  const [note, setNote] = useState(() => {
+    return localStorage.getItem("draft_note") || "";
+  });
+  const [orderDiscount, setOrderDiscount] = useState(() => {
+    return Number(localStorage.getItem("draft_orderDiscount")) || 0;
+  });
+  const [discountType, setDiscountType] = useState(() => {
+    return localStorage.getItem("draft_discountType") || "money";
+  });
+  const [saleDate, setSaleDate] = useState(() => {
+    return localStorage.getItem("draft_saleDate") || new Date().toISOString().slice(0, 16);
+  });
 
   const [config, setConfig] = useState(null);
   const componentRef = useRef(null);
   const searchRef = useRef(null);
   const custSearchRef = useRef(null);
-
   const barcodeBuffer = useRef("");
+
+  // --- PHẦN CHỈNH SỬA: TỰ ĐỘNG LƯU KHI CÓ THAY ĐỔI ---
+  useEffect(() => {
+    localStorage.setItem("draft_cart", JSON.stringify(cart));
+    localStorage.setItem("draft_customer", JSON.stringify(customer));
+    localStorage.setItem("draft_note", note);
+    localStorage.setItem("draft_orderDiscount", orderDiscount);
+    localStorage.setItem("draft_discountType", discountType);
+    localStorage.setItem("draft_saleDate", saleDate);
+  }, [cart, customer, note, orderDiscount, discountType, saleDate]);
 
   useEffect(() => {
     axios.get("/api/products").then(res => setProducts(res.data));
@@ -119,15 +142,23 @@ export default function Invoice() {
     }
   });
 
+  // --- PHẦN CHỈNH SỬA: XÓA SẠCH BỘ NHỚ TẠM SAU KHI XONG ---
   const resetForm = () => {
     setCart([]); 
     setCustomer({ name: "", phone: "" }); 
     setNote("");
     setOrderDiscount(0);
-    setSaleDate(new Date().toISOString().slice(0, 16)); // Reset lại ngày giờ hiện tại
+    setSaleDate(new Date().toISOString().slice(0, 16));
+    
+    // Xóa các key draft trong localStorage
+    localStorage.removeItem("draft_cart");
+    localStorage.removeItem("draft_customer");
+    localStorage.removeItem("draft_note");
+    localStorage.removeItem("draft_orderDiscount");
+    localStorage.removeItem("draft_discountType");
+    localStorage.removeItem("draft_saleDate");
   };
 
-  // --- HÀM GỬI EMAIL ---
   const sendEmailNotification = (invoiceData, serverInvoiceId) => {
     axios.post("/api/send-invoice-email", {
       invoiceId: serverInvoiceId || "MỚI",
@@ -136,7 +167,7 @@ export default function Invoice() {
       final_total: invoiceData.final_total,
       customerName: invoiceData.customer_name,
       items: invoiceData.items,
-      saleDate: invoiceData.created_at // Gửi ngày giờ qua mail
+      saleDate: invoiceData.created_at
     }).catch(err => console.error("Lỗi gửi mail ngầm:", err));
   };
 
@@ -150,7 +181,7 @@ export default function Invoice() {
       total: subTotal,
       discount: actualDiscountValue,
       final_total: finalTotal,
-      created_at: saleDate, // Gửi ngày giờ đã chọn lên server
+      created_at: saleDate,
       items: cart.map(item => {
         const itemDiscValue = item.discType === "percent" 
           ? (item.price * item.qty * (item.discount || 0) / 100) 
@@ -208,7 +239,7 @@ export default function Invoice() {
                         customerName: customer.name || "Khách lẻ",
                         customerPhone: customer.phone || "N/A",
                         note: note,
-                        date: new Date(saleDate).toLocaleString('vi-VN'), // Sử dụng ngày giờ đã chọn để in
+                        date: new Date(saleDate).toLocaleString('vi-VN'),
                         products: cart.map(i => {
                             const discVal = i.discType === "percent" 
                                 ? (i.price * i.qty * (i.discount || 0) / 100) 
@@ -319,13 +350,13 @@ export default function Invoice() {
         </div>
       </div>
 
+      {/* BÊN PHẢI: THÔNG TIN KHÁCH HÀNG & THANH TOÁN */}
       <div className="w-full lg:w-[380px] flex flex-col gap-6 overflow-y-auto no-scrollbar pr-1">
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex-shrink-0" ref={custSearchRef}>
           <h2 className="font-black uppercase italic text-xs mb-4 text-blue-600 flex items-center gap-2">
             <User size={16}/> Khách hàng & Thời gian
           </h2>
           <div className="space-y-3">
-            {/* PHẦN CHỈNH NGÀY GIỜ MỚI THÊM */}
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
