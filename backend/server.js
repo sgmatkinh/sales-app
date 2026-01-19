@@ -119,7 +119,7 @@ cron.schedule("45 19 * * *", async () => {
         const mailOptions = {
             from: '"SalesHub Báo Cáo" <sgmatkinh@gmail.com>',
             to: "nguyentm.tmn@gmail.com, nguyentm.abc@gmail.com, sgmatkinh@gmail.com",
-            subject: `📊 TỔNG KẾT NGÀY ${new Date().toLocaleDateString('vi-VN')}`,
+            subject: `📊 Báo Cáo Tổng Kết ${new Date().toLocaleDateString('vi-VN')}`,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; border: 1px solid #2563eb; padding: 20px; border-radius: 15px;">
                     <h2 style="color: #2563eb; text-align: center;">KẾT QUẢ BÁN HÀNG HÔM NAY</h2>
