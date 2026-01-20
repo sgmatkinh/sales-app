@@ -49,7 +49,7 @@ export default function Login({ onLoginSuccess }) {
         }, 1000);
       }
     } catch (err) {
-      setError("Thông tin xác thực không chính xác!");
+      setError("Accept Denied");
     } finally {
       // Chỉ tắt loading nếu không đăng nhập thành công (để giữ trạng thái success đẹp)
       if (!isAdmin && !isKyThuat && !isKeToan && !isMksg) {
@@ -167,7 +167,7 @@ export default function Login({ onLoginSuccess }) {
                   : 'animate-warning-light'
                 }`}></div>
                 <span className={`text-[10px] font-black uppercase tracking-widest italic ${isSuccess ? 'text-green-400' : 'text-slate-400'}`}>
-                  {isSuccess ? "Truy cập được chấp nhận" : "Hệ Thống Được Bảo Mật"}
+                  {isSuccess ? "Access Granted" : "Hệ thống đã được bảo vệ"}
                 </span>
              </div>
           </div>

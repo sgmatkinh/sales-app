@@ -1,36 +1,53 @@
-import React from "react";
+import React, { forwardRef } from "react";
 
-const InvoiceTemplate = ({ config, data }) => {
+// Mày đã dùng forwardRef là chuẩn rồi, tao giữ nguyên cấu trúc này
+const InvoiceTemplate = forwardRef(({ config, data }, ref) => {
+  // Tránh render lỗi nếu dữ liệu chưa kịp đổ về
   if (!config || !data) return null;
 
   return (
     <div 
-      className="p-2 bg-white text-black font-sans mx-auto antialiased" 
+      ref={ref} 
+      className="invoice-print-area p-2 bg-white text-black font-sans mx-auto antialiased" 
       style={{ 
         width: "80mm", 
+        minHeight: "100mm", // Thêm minHeight để tránh frame trống
         fontSize: "14px", 
         lineHeight: "1.3",
         color: "#000",
+        backgroundColor: "#fff"
       }}
     >
       <style>{`
+        /* CSS dành riêng cho lúc bấm nút In */
         @media print {
-          @page { size: 80mm auto; margin: 0; }
+          @page { 
+            size: 80mm auto; 
+            margin: 0; 
+          }
           body { 
             -webkit-print-color-adjust: exact !important; 
             print-color-adjust: exact !important;
+            background-color: white !important;
           }
-          /* Ép không cho tràn lề trái để tránh vướng vết hồng nếu do trục in */
+          /* Đảm bảo không bị ẩn khi in */
+          .invoice-print-area {
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+          }
           .print-container { margin-left: 2mm !important; } 
         }
       `}</style>
 
       {/* 1. LOGO & HEADER */}
       <div className="flex flex-col items-center text-center mb-4 w-full print-container">
+        {/* Thêm crossOrigin và cố định kích thước để tránh trắng trang do ảnh chưa load */}
         <img 
           src="/logo-shop-net.png" 
           alt="logo shop" 
           className="w-20 h-20 object-contain mb-2 mx-auto block"
+          style={{ display: 'block', maxWidth: '80px' }}
           onError={(e) => e.target.style.display = 'none'} 
         />
         <h1 className="text-xl font-black uppercase w-full">{config.shopName}</h1>
@@ -52,7 +69,7 @@ const InvoiceTemplate = ({ config, data }) => {
         </div>
       </div>
 
-      {/* 3. BẢNG SẢN PHẨM - FIX CỘT SL */}
+      {/* 3. BẢNG SẢN PHẨM */}
       <table className="w-full mb-4 border-collapse print-container">
         <thead>
           <tr className="border-b-2 border-black text-left uppercase text-[12px] font-black">
@@ -97,13 +114,14 @@ const InvoiceTemplate = ({ config, data }) => {
         </div>
       </div>
 
-      {/* 6. QR CODE CÂN ĐỐI */}
+      {/* 6. QR CODE */}
       <div className="mt-6 flex flex-col items-center text-center w-full print-container">
         <p className="text-[12px] font-black uppercase mb-1">Thanh toán chuyển khoản</p>
         <img 
           src="/qr-thanh-toan.png" 
           alt="QR" 
           className="w-32 h-32 object-contain mb-3 border border-black p-1 mx-auto block"
+          style={{ display: 'block', maxWidth: '128px' }}
           onError={(e) => e.target.style.display = 'none'} 
         />
         <p className="font-black italic uppercase text-sm border-t border-black w-full pt-2">Cảm ơn & Hẹn gặp lại!</p>
@@ -111,6 +129,6 @@ const InvoiceTemplate = ({ config, data }) => {
       </div>
     </div>
   );
-};
+});
 
 export default InvoiceTemplate;

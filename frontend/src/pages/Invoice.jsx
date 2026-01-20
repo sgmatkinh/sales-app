@@ -19,7 +19,6 @@ export default function Invoice() {
   // --- HÀM LẤY GIỜ VIỆT NAM CHUẨN (UTC+7) ---
   const getLocalDatetimeString = () => {
     const now = new Date();
-    // Chuyển sang múi giờ VN (UTC+7) bằng cách cộng 7 tiếng vào giờ chuẩn quốc tế
     const vnTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
     return vnTime.toISOString().slice(0, 16);
   };
@@ -43,14 +42,24 @@ export default function Invoice() {
     return localStorage.getItem("draft_discountType") || "money";
   });
 
-  // QUAN TRỌNG: Không lấy từ localStorage để tránh bị kẹt giờ cũ
   const [saleDate, setSaleDate] = useState(getLocalDatetimeString());
-
   const [config, setConfig] = useState(null);
+  
   const componentRef = useRef(null);
   const searchRef = useRef(null);
   const custSearchRef = useRef(null);
   const barcodeBuffer = useRef("");
+
+  // --- LOGIC IN ẤN ---
+  // Sử dụng contentRef thay vì content theo chuẩn mới nhất
+  const reactToPrintFn = useReactToPrint({
+    contentRef: componentRef,
+    documentTitle: `Hoa_Don_${customer.phone || 'Le'}`,
+    onAfterPrint: () => {
+      alert("Đã in và lưu đơn thành công!");
+      resetForm();
+    }
+  });
 
   // --- LOGIC QUÉT BARCODE BẰNG CAMERA ---
   useEffect(() => {
@@ -65,7 +74,7 @@ export default function Invoice() {
         handleBarcodeScan(decodedText);
         setShowScanner(false);
         scanner.clear();
-      }, (error) => { /* Quét trượt kệ nó */ });
+      }, (error) => { });
     }
     return () => { if (scanner) scanner.clear().catch(e => console.error(e)); };
   }, [showScanner]);
@@ -77,7 +86,6 @@ export default function Invoice() {
     localStorage.setItem("draft_note", note);
     localStorage.setItem("draft_orderDiscount", orderDiscount);
     localStorage.setItem("draft_discountType", discountType);
-    // Bỏ lưu draft_saleDate để mỗi lần F5 là nó lấy giờ mới nhất
   }, [cart, customer, note, orderDiscount, discountType]);
 
   useEffect(() => {
@@ -113,7 +121,6 @@ export default function Invoice() {
     };
   }, []);
 
-  // --- CÁC HÀM LOGIC ---
   const handleBarcodeScan = async (sku) => {
     try {
       const res = await axios.get(`/api/products/find-by-sku/${sku}`);
@@ -150,22 +157,13 @@ export default function Invoice() {
   const actualDiscountValue = discountType === "money" ? orderDiscount : (subTotal * orderDiscount) / 100;
   const finalTotal = Math.max(0, subTotal - actualDiscountValue);
 
-  const handlePrint = useReactToPrint({
-    contentRef: componentRef,
-    documentTitle: `Hoa_Don_${customer.phone || 'Le'}`,
-    onAfterPrint: () => {
-        alert("Đã in và lưu đơn thành công!");
-        resetForm();
-    }
-  });
-
   const resetForm = () => {
     setCart([]); setCustomer({ name: "", phone: "" }); setNote(""); setOrderDiscount(0);
-    setSaleDate(getLocalDatetimeString()); // Reset về giờ VN mới nhất
+    setSaleDate(getLocalDatetimeString()); 
     localStorage.removeItem("draft_cart"); localStorage.removeItem("draft_customer");
     localStorage.removeItem("draft_note"); localStorage.removeItem("draft_orderDiscount");
     localStorage.removeItem("draft_discountType");
-    localStorage.removeItem("draft_saleDate"); // Xóa luôn rác cũ nếu có
+    localStorage.removeItem("draft_saleDate");
   };
 
   const sendEmailNotification = (invoiceData, serverInvoiceId) => {
@@ -195,17 +193,26 @@ export default function Invoice() {
     try {
       const res = await axios.post("/api/invoices", invoiceData);
       sendEmailNotification(invoiceData, res.data?.id);
+      
       if (isPrint) {
+        // Luôn đảm bảo config được load trước khi in
         const saved = localStorage.getItem("shopConfig");
-        if (saved) { setConfig(JSON.parse(saved)); setTimeout(() => handlePrint(), 100); } else handlePrint();
-      } else { alert("Lưu đơn thành công!"); resetForm(); }
-    } catch (err) { alert("Lỗi lưu đơn rồi mày!"); }
+        if (saved) setConfig(JSON.parse(saved));
+        
+        // Gọi hàm in từ hook
+        reactToPrintFn();
+      } else { 
+        alert("Lưu đơn thành công!"); 
+        resetForm(); 
+      }
+    } catch (err) { 
+      alert("Lỗi lưu đơn rồi mày!"); 
+    }
   };
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 p-3 lg:p-6 bg-slate-50 min-h-screen lg:h-screen lg:overflow-hidden font-sans text-slate-900">
       
-      {/* MODAL QUÉT BARCODE CHO MOBILE */}
       {showScanner && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
           <button onClick={() => setShowScanner(false)} className="absolute top-5 right-5 text-white p-3 bg-red-600 rounded-full shadow-lg">
@@ -221,7 +228,7 @@ export default function Invoice() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* PHẦN IN ẤN */}
+      {/* VÙNG IN: ẨN KHỎI GIAO DIỆN NHƯNG VẪN CÓ TRONG DOM */}
       <div style={{ display: "none" }}>
         <div ref={componentRef}>
             {config && (
@@ -240,38 +247,22 @@ export default function Invoice() {
         </div>
       </div>
 
-      {/* BÊN TRÁI: GIỎ HÀNG */}
       <div className="flex-1 flex flex-col gap-4 lg:gap-6 min-h-0">
         <div className="bg-white p-4 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] shadow-sm border border-slate-100 flex-shrink-0" ref={searchRef}>
           <div className="flex items-center gap-3 mb-4 lg:mb-6">
             <div className="p-2 lg:p-3 bg-blue-600 rounded-xl lg:rounded-2xl text-white shadow-lg shadow-blue-200"><ShoppingCart size={20}/></div>
             <h2 className="text-lg lg:text-xl font-black text-slate-800 uppercase italic">Bán hàng lẻ</h2>
-            
-            <button 
-              onClick={() => setShowScanner(true)}
-              className="ml-auto lg:hidden flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-black text-[10px] shadow-lg active:scale-95"
-            >
-              <Camera size={16}/> QUÉT MÃ
-            </button>
+            <button onClick={() => setShowScanner(true)} className="ml-auto lg:hidden flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-black text-[10px] shadow-lg active:scale-95"><Camera size={16}/> QUÉT MÃ</button>
             <span className="hidden lg:block ml-auto text-[8px] lg:text-[10px] bg-green-100 text-green-600 px-2 lg:px-3 py-1 rounded-full font-bold animate-pulse">SCANNER READY</span>
           </div>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              className="w-full pl-11 pr-4 py-3 lg:py-4 bg-slate-50 rounded-xl lg:rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border-none text-base lg:text-lg font-bold" 
-              placeholder="Tên kính hoặc Barcode..." 
-              value={search} 
-              onChange={e => {setSearch(e.target.value); setShowSuggest(true)}}
-              onKeyDown={(e) => e.key === 'Enter' && search.length > 0 && handleBarcodeScan(search)}
-            />
+            <input className="w-full pl-11 pr-4 py-3 lg:py-4 bg-slate-50 rounded-xl lg:rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border-none text-base lg:text-lg font-bold" placeholder="Tên kính hoặc Barcode..." value={search} onChange={e => {setSearch(e.target.value); setShowSuggest(true)}} onKeyDown={(e) => e.key === 'Enter' && search.length > 0 && handleBarcodeScan(search)} />
             {showSuggest && search && (
               <div className="absolute bg-white border border-slate-100 w-full mt-2 rounded-xl shadow-2xl z-50 max-h-60 overflow-auto no-scrollbar divide-y divide-slate-50">
                 {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku && p.sku.toLowerCase().includes(search.toLowerCase()))).map(p => (
                   <div key={p.id} className="p-3 lg:p-4 hover:bg-blue-50 cursor-pointer flex justify-between items-center" onClick={() => addToCart(p)}>
-                    <div>
-                      <div className="font-bold text-sm lg:text-base text-slate-700">{p.name}</div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{p.sku ? `SKU: ${p.sku} | ` : ""}Tồn: {p.stock}</div>
-                    </div>
+                    <div><div className="font-bold text-sm lg:text-base text-slate-700">{p.name}</div><div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{p.sku ? `SKU: ${p.sku} | ` : ""}Tồn: {p.stock}</div></div>
                     <div className="text-blue-600 font-black text-sm lg:text-base">{Number(p.price).toLocaleString()}đ</div>
                   </div>
                 ))}
@@ -280,7 +271,6 @@ export default function Invoice() {
           </div>
         </div>
 
-        {/* BẢNG GIỎ HÀNG */}
         <div className="bg-white rounded-[1.5rem] lg:rounded-[2.5rem] shadow-sm border border-slate-100 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto lg:overflow-y-auto flex-1 no-scrollbar">
             <table className="w-full min-w-[600px] lg:min-w-full">
@@ -296,30 +286,11 @@ export default function Invoice() {
               <tbody className="divide-y divide-slate-50">
                 {cart.map((item, index) => (
                   <tr key={index} className="hover:bg-slate-50/50 transition-all group">
-                    <td className="p-3 lg:p-5 text-left">
-                      <div className="font-black text-slate-800 uppercase text-xs lg:text-sm italic truncate max-w-[150px] lg:max-w-none">{item.name}</div>
-                      <div className="text-[10px] text-slate-400 font-bold">{item.price.toLocaleString()}đ</div>
-                    </td>
-                    <td className="p-3 lg:p-5 text-center">
-                      <div className="flex items-center justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto">
-                          <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 lg:w-7 lg:h-7 flex items-center justify-center bg-white rounded-md lg:rounded-lg shadow-sm font-black">-</button>
-                          <span className="font-black text-slate-700 px-2 text-sm">{item.qty}</span>
-                          <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 lg:w-7 lg:h-7 flex items-center justify-center bg-white rounded-md lg:rounded-lg shadow-sm font-black">+</button>
-                      </div>
-                    </td>
-                    <td className="p-3 lg:p-5 text-center">
-                      <div className="flex items-center gap-1 justify-center">
-                        <div className="flex bg-slate-100 p-0.5 lg:p-1 rounded-lg border border-slate-200">
-                          <button onClick={() => updateItemDiscount(item.id, "discType", "percent")} className={`px-1.5 py-0.5 rounded-md text-[8px] lg:text-[10px] font-black ${item.discType === 'percent' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>%</button>
-                          <button onClick={() => updateItemDiscount(item.id, "discType", "money")} className={`px-1.5 py-0.5 rounded-md text-[8px] lg:text-[10px] font-black ${item.discType === 'money' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Đ</button>
-                        </div>
-                        <input type="number" className="w-14 lg:w-20 bg-slate-50 border-none rounded-lg text-right p-1.5 font-black text-[10px] lg:text-xs outline-none text-blue-600" value={item.discount || ""} placeholder="0" onChange={(e) => updateItemDiscount(item.id, "discount", Number(e.target.value))} />
-                      </div>
-                    </td>
+                    <td className="p-3 lg:p-5 text-left"><div className="font-black text-slate-800 uppercase text-xs lg:text-sm italic truncate max-w-[150px] lg:max-w-none">{item.name}</div><div className="text-[10px] text-slate-400 font-bold">{item.price.toLocaleString()}đ</div></td>
+                    <td className="p-3 lg:p-5 text-center"><div className="flex items-center justify-center gap-1 bg-slate-100 p-1 rounded-lg w-fit mx-auto"><button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 lg:w-7 lg:h-7 flex items-center justify-center bg-white rounded-md lg:rounded-lg shadow-sm font-black">-</button><span className="font-black text-slate-700 px-2 text-sm">{item.qty}</span><button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 lg:w-7 lg:h-7 flex items-center justify-center bg-white rounded-md lg:rounded-lg shadow-sm font-black">+</button></div></td>
+                    <td className="p-3 lg:p-5 text-center"><div className="flex items-center gap-1 justify-center"><div className="flex bg-slate-100 p-0.5 lg:p-1 rounded-lg border border-slate-200"><button onClick={() => updateItemDiscount(item.id, "discType", "percent")} className={`px-1.5 py-0.5 rounded-md text-[8px] lg:text-[10px] font-black ${item.discType === 'percent' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>%</button><button onClick={() => updateItemDiscount(item.id, "discType", "money")} className={`px-1.5 py-0.5 rounded-md text-[8px] lg:text-[10px] font-black ${item.discType === 'money' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>Đ</button></div><input type="number" className="w-14 lg:w-20 bg-slate-50 border-none rounded-lg text-right p-1.5 font-black text-[10px] lg:text-xs outline-none text-blue-600" value={item.discount || ""} placeholder="0" onChange={(e) => updateItemDiscount(item.id, "discount", Number(e.target.value))} /></div></td>
                     <td className="p-3 lg:p-5 text-right font-black text-slate-800 text-sm">{getItemFinalPrice(item).toLocaleString()}đ</td>
-                    <td className="p-3 lg:p-5 text-center">
-                      <button onClick={() => setCart(cart.filter((_, idx) => idx !== index))} className="text-slate-200 hover:text-red-500"><Trash2 size={16}/></button>
-                    </td>
+                    <td className="p-3 lg:p-5 text-center"><button onClick={() => setCart(cart.filter((_, idx) => idx !== index))} className="text-slate-200 hover:text-red-500"><Trash2 size={16}/></button></td>
                   </tr>
                 ))}
               </tbody>
@@ -328,45 +299,24 @@ export default function Invoice() {
         </div>
       </div>
 
-      {/* BÊN PHẢI: THANH TOÁN */}
       <div className="w-full lg:w-[380px] flex flex-col gap-4 lg:gap-6 lg:overflow-y-auto no-scrollbar">
         <div className="bg-white p-5 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] shadow-sm border border-slate-100 flex-shrink-0" ref={custSearchRef}>
           <h2 className="font-black uppercase italic text-xs mb-4 text-blue-600 flex items-center gap-2"><User size={16}/> Khách hàng & Thời gian</h2>
           <div className="space-y-3">
+            <div className="relative"><Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input type="datetime-local" className="w-full pl-11 pr-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl outline-none font-bold text-xs border border-blue-100" value={saleDate} onChange={e => setSaleDate(e.target.value)} /></div>
             <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input type="datetime-local" className="w-full pl-11 pr-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl outline-none font-bold text-xs border border-blue-100" value={saleDate} onChange={e => setSaleDate(e.target.value)} />
-            </div>
-            <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl outline-none font-bold uppercase text-xs" placeholder="Tên khách..." value={customer.name} onChange={e => {setCustomer({...customer, name: e.target.value}); setShowNameSuggest(true)}} />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl outline-none font-bold uppercase text-xs" placeholder="Tên khách..." value={customer.name} onChange={e => {setCustomer({...customer, name: e.target.value}); setShowNameSuggest(true)}} />
               {showNameSuggest && customer.name && (
-                <div className="absolute z-20 bg-white border w-full mt-1 rounded-xl shadow-2xl max-h-48 overflow-auto no-scrollbar divide-y">
-                  {allCustomers.filter(c => c.name.toLowerCase().includes(customer.name.toLowerCase())).map(c => (
-                    <div key={c.phone} className="p-3 hover:bg-slate-50 cursor-pointer text-xs" onClick={() => {setCustomer({name: c.name, phone: c.phone}); setShowNameSuggest(false)}}>
-                      <div className="font-black uppercase">{c.name}</div><div className="text-slate-400">{c.phone}</div>
-                    </div>
-                  ))}
-                </div>
+                <div className="absolute z-20 bg-white border w-full mt-1 rounded-xl shadow-2xl max-h-48 overflow-auto no-scrollbar divide-y">{allCustomers.filter(c => c.name.toLowerCase().includes(customer.name.toLowerCase())).map(c => (<div key={c.phone} className="p-3 hover:bg-slate-50 cursor-pointer text-xs" onClick={() => {setCustomer({name: c.name, phone: c.phone}); setShowNameSuggest(false)}}><div className="font-black uppercase">{c.name}</div><div className="text-slate-400">{c.phone}</div></div>))}</div>
               )}
             </div>
             <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl outline-none font-bold text-xs" placeholder="SĐT..." value={customer.phone} onChange={e => {setCustomer({...customer, phone: e.target.value}); setShowCustSuggest(true)}} />
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} /><input className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl outline-none font-bold text-xs" placeholder="SĐT..." value={customer.phone} onChange={e => {setCustomer({...customer, phone: e.target.value}); setShowCustSuggest(true)}} />
               {showCustSuggest && customer.phone && (
-                <div className="absolute z-20 bg-white border w-full mt-1 rounded-xl shadow-2xl max-h-48 overflow-auto no-scrollbar divide-y">
-                  {allCustomers.filter(c => c.phone.includes(customer.phone)).map(c => (
-                    <div key={c.phone} className="p-3 hover:bg-slate-50 cursor-pointer text-xs" onClick={() => {setCustomer({name: c.name, phone: c.phone}); setShowCustSuggest(false)}}>
-                      <div className="font-black uppercase">{c.name}</div><div className="text-slate-400">{c.phone}</div>
-                    </div>
-                  ))}
-                </div>
+                <div className="absolute z-20 bg-white border w-full mt-1 rounded-xl shadow-2xl max-h-48 overflow-auto no-scrollbar divide-y">{allCustomers.filter(c => c.phone.includes(customer.phone)).map(c => (<div key={c.phone} className="p-3 hover:bg-slate-50 cursor-pointer text-xs" onClick={() => {setCustomer({name: c.name, phone: c.phone}); setShowCustSuggest(false)}}><div className="font-black uppercase">{c.name}</div><div className="text-slate-400">{c.phone}</div></div>))}</div>
               )}
             </div>
-            <div className="relative">
-              <StickyNote className="absolute left-4 top-3 text-slate-400" size={16} />
-              <textarea className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl outline-none font-bold text-xs min-h-[60px]" placeholder="Ghi chú..." value={note} onChange={e => setNote(e.target.value)} />
-            </div>
+            <div className="relative"><StickyNote className="absolute left-4 top-3 text-slate-400" size={16} /><textarea className="w-full pl-11 pr-4 py-2.5 bg-slate-50 rounded-xl outline-none font-bold text-xs min-h-[60px]" placeholder="Ghi chú..." value={note} onChange={e => setNote(e.target.value)} /></div>
           </div>
         </div>
 
