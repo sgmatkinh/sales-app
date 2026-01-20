@@ -49,10 +49,10 @@ export default function Login({ onLoginSuccess }) {
 
         <div className="bg-slate-900/40 backdrop-blur-2xl border border-white/10 p-10 rounded-[3rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Hệ Thống Sales</h2>
+            <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Quản Lý Bán Hàng</h2>
             <div className="flex items-center justify-center gap-2 mt-2">
               <span className="h-[1px] w-8 bg-slate-700"></span>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.4em]">Security Access</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.4em]">Mắt Kính Sài Gòn</p>
               <span className="h-[1px] w-8 bg-slate-700"></span>
             </div>
           </div>
@@ -112,7 +112,7 @@ export default function Login({ onLoginSuccess }) {
                 </>
               ) : (
                 <>
-                  <span>Xác thực truy cập</span>
+                  <span>Đăng Nhập Hệ Thống</span>
                 </>
               )}
             </button>
