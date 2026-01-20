@@ -76,8 +76,8 @@ router.post("/", (req, res) => {
     }
 
     // C. INSERT HÓA ĐƠN TỔNG
-    // SỬA TẠI ĐÂY: Lấy giờ ISO chuẩn từ Node.js để tránh lệch múi giờ SQLite
-    const nowISO = new Date().toISOString();
+    // SỬA TẠI ĐÂY: Lấy giờ Việt Nam định dạng YYYY-MM-DD HH:mm:ss
+    const nowVN = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
     
     const result = db.prepare(`
       INSERT INTO invoices (
@@ -92,7 +92,7 @@ router.post("/", (req, res) => {
       final_total,
       note || "",
       created_at, // Ưu tiên ngày từ Frontend
-      nowISO      // Nếu không có mới dùng giờ chuẩn hệ thống
+      nowVN       // Nếu không có mới dùng giờ chuẩn Việt Nam
     );
 
     const invoiceId = result.lastInsertRowid;
@@ -156,7 +156,6 @@ router.get("/:id", (req, res) => {
 ===================================================== */
 router.get("/dashboard/chart", (req, res) => {
   try {
-    // SỬA TẠI ĐÂY: Dùng định dạng ngày đơn giản để Group By chính xác hơn
     const data = db.prepare(`
       SELECT date(created_at) as day, IFNULL(SUM(final_total), 0) as revenue
       FROM invoices

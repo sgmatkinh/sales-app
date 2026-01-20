@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { Trash2, Search, User, Phone, CreditCard, Printer, Save, ShoppingCart, StickyNote, Calendar, Camera, X } from "lucide-react";
-import { Html5QrcodeScanner } from "html5-qrcode"; // 1. Thêm dòng này
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 // 1. IMPORT TEMPLATE VÀ THƯ VIỆN IN
 import InvoiceTemplate from "../components/InvoiceTemplate";
@@ -14,9 +14,17 @@ export default function Invoice() {
   const [showSuggest, setShowSuggest] = useState(false);
   const [showCustSuggest, setShowCustSuggest] = useState(false);
   const [showNameSuggest, setShowNameSuggest] = useState(false);
-  const [showScanner, setShowScanner] = useState(false); // 2. State ẩn hiện camera
+  const [showScanner, setShowScanner] = useState(false);
 
-  // --- PHẦN GIỮ NGUYÊN LOGIC STATE ---
+  // --- HÀM LẤY GIỜ VIỆT NAM CHUẨN (UTC+7) ---
+  const getLocalDatetimeString = () => {
+    const now = new Date();
+    // Chuyển sang múi giờ VN (UTC+7) bằng cách cộng 7 tiếng vào giờ chuẩn quốc tế
+    const vnTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    return vnTime.toISOString().slice(0, 16);
+  };
+
+  // --- PHẦN LOGIC STATE ---
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem("draft_cart");
     return saved ? JSON.parse(saved) : [];
@@ -34,9 +42,9 @@ export default function Invoice() {
   const [discountType, setDiscountType] = useState(() => {
     return localStorage.getItem("draft_discountType") || "money";
   });
-  const [saleDate, setSaleDate] = useState(() => {
-    return localStorage.getItem("draft_saleDate") || new Date().toISOString().slice(0, 16);
-  });
+
+  // QUAN TRỌNG: Không lấy từ localStorage để tránh bị kẹt giờ cũ
+  const [saleDate, setSaleDate] = useState(getLocalDatetimeString());
 
   const [config, setConfig] = useState(null);
   const componentRef = useRef(null);
@@ -62,15 +70,15 @@ export default function Invoice() {
     return () => { if (scanner) scanner.clear().catch(e => console.error(e)); };
   }, [showScanner]);
 
-  // --- PHẦN GIỮ NGUYÊN LOGIC EFFECT ---
+  // --- PHẦN LOGIC EFFECT ---
   useEffect(() => {
     localStorage.setItem("draft_cart", JSON.stringify(cart));
     localStorage.setItem("draft_customer", JSON.stringify(customer));
     localStorage.setItem("draft_note", note);
     localStorage.setItem("draft_orderDiscount", orderDiscount);
     localStorage.setItem("draft_discountType", discountType);
-    localStorage.setItem("draft_saleDate", saleDate);
-  }, [cart, customer, note, orderDiscount, discountType, saleDate]);
+    // Bỏ lưu draft_saleDate để mỗi lần F5 là nó lấy giờ mới nhất
+  }, [cart, customer, note, orderDiscount, discountType]);
 
   useEffect(() => {
     axios.get("/api/products").then(res => setProducts(res.data));
@@ -105,7 +113,7 @@ export default function Invoice() {
     };
   }, []);
 
-  // --- GIỮ NGUYÊN TẤT CẢ CÁC HÀM LOGIC ---
+  // --- CÁC HÀM LOGIC ---
   const handleBarcodeScan = async (sku) => {
     try {
       const res = await axios.get(`/api/products/find-by-sku/${sku}`);
@@ -153,10 +161,11 @@ export default function Invoice() {
 
   const resetForm = () => {
     setCart([]); setCustomer({ name: "", phone: "" }); setNote(""); setOrderDiscount(0);
-    setSaleDate(new Date().toISOString().slice(0, 16));
+    setSaleDate(getLocalDatetimeString()); // Reset về giờ VN mới nhất
     localStorage.removeItem("draft_cart"); localStorage.removeItem("draft_customer");
     localStorage.removeItem("draft_note"); localStorage.removeItem("draft_orderDiscount");
-    localStorage.removeItem("draft_discountType"); localStorage.removeItem("draft_saleDate");
+    localStorage.removeItem("draft_discountType");
+    localStorage.removeItem("draft_saleDate"); // Xóa luôn rác cũ nếu có
   };
 
   const sendEmailNotification = (invoiceData, serverInvoiceId) => {
@@ -176,7 +185,8 @@ export default function Invoice() {
     const invoiceData = {
       customer_name: customer.name || "Khách lẻ",
       customer_phone: customer.phone || "N/A",
-      note: note, total: subTotal, discount: actualDiscountValue, final_total: finalTotal, created_at: saleDate,
+      note: note, total: subTotal, discount: actualDiscountValue, final_total: finalTotal, 
+      created_at: saleDate, 
       items: cart.map(item => {
         const itemDiscValue = item.discType === "percent" ? (item.price * item.qty * (item.discount || 0) / 100) : (item.discount || 0);
         return { product_id: item.id, product_name: item.name, quantity: item.qty, price: item.price, item_discount: itemDiscValue, total: (item.price * item.qty) - itemDiscValue };
@@ -211,14 +221,15 @@ export default function Invoice() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* PHẦN IN ẤN GIỮ NGUYÊN */}
+      {/* PHẦN IN ẤN */}
       <div style={{ display: "none" }}>
         <div ref={componentRef}>
             {config && (
                 <InvoiceTemplate config={config} data={{
                     customerName: customer.name || "Khách lẻ",
                     customerPhone: customer.phone || "N/A",
-                    note: note, date: new Date(saleDate).toLocaleString('vi-VN'),
+                    note: note, 
+                    date: saleDate.replace('T', ' '),
                     products: cart.map(i => {
                         const discVal = i.discType === "percent" ? (i.price * i.qty * (i.discount || 0) / 100) : (i.discount || 0);
                         return { name: i.name, qty: i.qty, price: Number(i.price), discount: discVal };
@@ -236,7 +247,6 @@ export default function Invoice() {
             <div className="p-2 lg:p-3 bg-blue-600 rounded-xl lg:rounded-2xl text-white shadow-lg shadow-blue-200"><ShoppingCart size={20}/></div>
             <h2 className="text-lg lg:text-xl font-black text-slate-800 uppercase italic">Bán hàng lẻ</h2>
             
-            {/* NÚT CAMERA CHO MOBILE */}
             <button 
               onClick={() => setShowScanner(true)}
               className="ml-auto lg:hidden flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-black text-[10px] shadow-lg active:scale-95"
@@ -247,10 +257,10 @@ export default function Invoice() {
           </div>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              className="w-full pl-11 pr-4 py-3 lg:py-4 bg-slate-50 rounded-xl lg:rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border-none text-base lg:text-lg font-bold" 
-              placeholder="Tên kính hoặc Barcode..." 
-              value={search} 
+            <input 
+              className="w-full pl-11 pr-4 py-3 lg:py-4 bg-slate-50 rounded-xl lg:rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 border-none text-base lg:text-lg font-bold" 
+              placeholder="Tên kính hoặc Barcode..." 
+              value={search} 
               onChange={e => {setSearch(e.target.value); setShowSuggest(true)}}
               onKeyDown={(e) => e.key === 'Enter' && search.length > 0 && handleBarcodeScan(search)}
             />
