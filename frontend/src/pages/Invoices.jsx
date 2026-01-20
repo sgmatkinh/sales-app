@@ -62,16 +62,27 @@ export default function Invoices() {
     }
   };
 
-  // Hàm định dạng ngày giờ để hiển thị cho đẹp
+  // --- HÀM ĐỊNH DẠNG NGÀY GIỜ: FIX LỆCH 7 TIẾNG VÀ ĐỊNH DẠNG SQLITE ---
   const formatDateTime = (dateStr) => {
     if (!dateStr) return "---";
-    const d = new Date(dateStr);
+    
+    // Nếu là chuỗi từ SQLite (có dấu cách ở giữa), thay bằng 'T' để JS hiểu đúng múi giờ
+    const fixedStr = (typeof dateStr === 'string' && dateStr.includes(' ') && !dateStr.includes('T')) 
+      ? dateStr.replace(' ', 'T') 
+      : dateStr;
+
+    const d = new Date(fixedStr);
+    if (isNaN(d.getTime())) return dateStr;
+
+    // Ép về múi giờ VN và định dạng chuẩn
     return d.toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false
     });
   };
 
@@ -93,7 +104,6 @@ export default function Invoices() {
                 customerName: selectedInvoice.customer_name,
                 customerPhone: selectedInvoice.customer_phone,
                 note: selectedInvoice.note,
-                // Truyền đúng ngày giờ từ DB vào template in
                 date: formatDateTime(selectedInvoice.created_at),
                 products: selectedInvoice.items.map(i => ({
                   name: i.product_name,
@@ -138,32 +148,37 @@ export default function Invoices() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filteredInvoices.map((inv) => (
-              <tr key={inv.id} className="hover:bg-blue-50/30 transition-colors group">
-                <td className="p-6">
-                  {/* Sửa hiển thị ngày giờ tại đây */}
-                  <div className="font-bold text-slate-700">
-                    {new Date(inv.created_at).toLocaleDateString('vi-VN')}
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">
-                    {new Date(inv.created_at).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
-                  </div>
-                </td>
-                <td className="p-6">
-                  <div className="font-black text-slate-800 uppercase text-sm italic">{inv.customer_name}</div>
-                  <div className="text-xs text-blue-500 font-bold">{inv.customer_phone}</div>
-                </td>
-                <td className="p-6 text-right">
-                  <div className="font-black text-slate-900 text-lg">{(inv.final_total || 0).toLocaleString()}đ</div>
-                </td>
-                <td className="p-6">
-                  <div className="flex justify-center gap-2">
-                    <button onClick={() => handleShowDetail(inv.id)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Eye size={18} /></button>
-                    <button onClick={() => handleDelete(inv.id)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {filteredInvoices.map((inv) => {
+              // Xử lý tách ngày và giờ từ chuỗi toLocaleString (thường là "dd/mm/yyyy, hh:mm")
+              const formatted = formatDateTime(inv.created_at);
+              const [datePart, timePart] = formatted.includes(', ') ? formatted.split(', ') : [formatted, ""];
+
+              return (
+                <tr key={inv.id} className="hover:bg-blue-50/30 transition-colors group">
+                  <td className="p-6">
+                    <div className="font-bold text-slate-700">
+                      {datePart}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">
+                      {timePart}
+                    </div>
+                  </td>
+                  <td className="p-6">
+                    <div className="font-black text-slate-800 uppercase text-sm italic">{inv.customer_name}</div>
+                    <div className="text-xs text-blue-500 font-bold">{inv.customer_phone}</div>
+                  </td>
+                  <td className="p-6 text-right">
+                    <div className="font-black text-slate-900 text-lg">{(inv.final_total || 0).toLocaleString()}đ</div>
+                  </td>
+                  <td className="p-6">
+                    <div className="flex justify-center gap-2">
+                      <button onClick={() => handleShowDetail(inv.id)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Eye size={18} /></button>
+                      <button onClick={() => handleDelete(inv.id)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18} /></button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -178,7 +193,6 @@ export default function Invoices() {
                 <div className="p-3 bg-blue-600 rounded-2xl"><FileText size={24}/></div>
                 <div>
                   <h2 className="text-xl font-black uppercase italic">Hóa đơn #{selectedInvoice.id}</h2>
-                  {/* Hiển thị ngày giờ rõ ràng trong Modal */}
                   <p className="text-blue-400 text-xs font-black uppercase tracking-widest">
                     Thời gian: {formatDateTime(selectedInvoice.created_at)}
                   </p>

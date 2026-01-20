@@ -76,12 +76,14 @@ router.post("/", (req, res) => {
     }
 
     // C. INSERT HÓA ĐƠN TỔNG
-    // SỬA TẠI ĐÂY: Sử dụng COALESCE để ưu tiên ngày từ Frontend, nếu không có mới dùng giờ hệ thống
+    // SỬA TẠI ĐÂY: Lấy giờ ISO chuẩn từ Node.js để tránh lệch múi giờ SQLite
+    const nowISO = new Date().toISOString();
+    
     const result = db.prepare(`
       INSERT INTO invoices (
         customer_name, customer_phone, total, discount, final_total, note, created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now','localtime')))
+      VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, ?))
     `).run(
       customer_name || "Khách lẻ",
       customer_phone || "",
@@ -89,7 +91,8 @@ router.post("/", (req, res) => {
       discountValue,
       final_total,
       note || "",
-      created_at // Truyền giá trị ngày giờ vào đây
+      created_at, // Ưu tiên ngày từ Frontend
+      nowISO      // Nếu không có mới dùng giờ chuẩn hệ thống
     );
 
     const invoiceId = result.lastInsertRowid;
@@ -117,7 +120,7 @@ router.post("/", (req, res) => {
       );
     });
 
-    res.json({ success: true, id: invoiceId }); // Trả về id để frontend dùng gửi mail
+    res.json({ success: true, id: invoiceId });
 
   } catch (err) {
     console.error("LỖI LƯU HÓA ĐƠN:", err.message);
@@ -153,11 +156,13 @@ router.get("/:id", (req, res) => {
 ===================================================== */
 router.get("/dashboard/chart", (req, res) => {
   try {
+    // SỬA TẠI ĐÂY: Dùng định dạng ngày đơn giản để Group By chính xác hơn
     const data = db.prepare(`
       SELECT date(created_at) as day, IFNULL(SUM(final_total), 0) as revenue
       FROM invoices
-      WHERE date(created_at) >= date('now','-6 days','localtime')
-      GROUP BY date(created_at) ORDER BY day
+      WHERE created_at >= date('now', '-6 days')
+      GROUP BY date(created_at) 
+      ORDER BY day ASC
     `).all();
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -181,14 +186,14 @@ router.put("/:id", (req, res) => {
 
   try {
     const updateInvoice = db.transaction(() => {
-      // 1. Cập nhật bảng invoices (Cập nhật luôn cả ngày giờ nếu có sửa)
+      // 1. Cập nhật bảng invoices
       db.prepare(`
         UPDATE invoices 
         SET customer_name = ?, customer_phone = ?, note = ?, total = ?, discount = ?, final_total = ?, created_at = COALESCE(?, created_at)
         WHERE id = ?
       `).run(customer_name, customer_phone, note, (Number(final_total) + Number(discount)), discount, final_total, created_at, id);
 
-      // 2. Xóa sạch items cũ rồi thêm lại mới để đảm bảo đồng bộ
+      // 2. Xóa sạch items cũ rồi thêm lại mới
       db.prepare(`DELETE FROM invoice_items WHERE invoice_id = ?`).run(id);
 
       const stmt = db.prepare(`
