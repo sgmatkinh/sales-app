@@ -20,19 +20,29 @@ try {
     )
   `).run();
 
-  const user = db.prepare("SELECT * FROM users WHERE username = ?").get("admin");
-  if (!user) {
-    db.prepare("INSERT INTO users (username, password) VALUES (?, ?)").run("admin", "123456");
-    console.log("=> ĐÃ KHỞI TẠO TÀI KHOẢN ADMIN MẶC ĐỊNH (admin/123456)");
+  // --- CHỖ NÀY TAO SỬA ĐỂ MÀY ĐỔI PASS DỄ DÀNG ---
+  const userMoi = "mksg"; // Tên đăng nhập mày muốn
+  const passMoi = "8386"; // Mật khẩu mày muốn
+
+  const checkUser = db.prepare("SELECT * FROM users WHERE username = ?").get(userMoi);
+  
+  if (!checkUser) {
+    // Nếu chưa có thì tạo mới
+    db.prepare("INSERT INTO users (username, password) VALUES (?, ?)").run(userMoi, passMoi);
+    console.log(`=> ĐÃ TẠO TÀI KHOẢN MỚI (${userMoi}/${passMoi})`);
+  } else {
+    // NẾU CÓ RỒI THÌ UPDATE MẬT KHẨU MỚI (Để đảm bảo mày đổi pass là nó nhận ngay)
+    db.prepare("UPDATE users SET password = ? WHERE username = ?").run(passMoi, userMoi);
+    console.log(`=> ĐÃ CẬP NHẬT MẬT KHẨU MỚI CHO: ${userMoi}`);
   }
 } catch (err) {
   console.error("Lỗi khởi tạo bảo mật:", err.message);
 }
 
 // ==========================================
-// 2. API ĐĂNG NHẬP & EMAIL
+// 2. API ĐĂNG NHẬP (SỬA ĐƯỜNG DẪN THÀNH /api/login)
 // ==========================================
-app.post("/login", (req, res) => {
+app.post("/api/login", (req, res) => { // Thêm /api vào đây cho khớp Frontend
   const { username, password } = req.body;
   try {
     const user = db.prepare("SELECT * FROM users WHERE username = ? AND password = ?").get(username, password);
@@ -46,7 +56,7 @@ app.post("/login", (req, res) => {
   }
 });
 
-// Giữ nguyên logic gửi mail của mày
+// --- GIỮ NGUYÊN LOGIC GỬI MAIL CỦA MÀY (KHÔNG ĐỤNG VÀO) ---
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -78,36 +88,31 @@ const sendEmailRoute = async (req, res) => {
 app.post("/send-invoice-email", sendEmailRoute);
 
 // ==========================================
-// 3. QUAN TRỌNG: KHAI BÁO CÁC ROUTE DỮ LIỆU
+// 3. CÁC ROUTE DỮ LIỆU (GIỮ NGUYÊN)
 // ==========================================
 const dashboardRoutes = require("./routes/dashboard");
 const productRoutes = require("./routes/products");
 const invoiceRoutes = require("./routes/invoices");
 const customerRoutes = require("./routes/customers");
 
-// Đặt trước 404 và Listen để dữ liệu Dashboard hiện lên
 app.use("/dashboard", dashboardRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-
 app.use("/products", productRoutes);
 app.use("/api/products", productRoutes);
-
 app.use("/invoices", invoiceRoutes);
 app.use("/api/invoices", invoiceRoutes);
-
 app.use("/customers", customerRoutes);
 app.use("/api/customers", customerRoutes);
 
 // ==========================================
-// 4. HẸN GIỜ BÁO CÁO (GIỮ NGUYÊN)
+// 4. HẸN GIỜ (GIỮ NGUYÊN)
 // ==========================================
 cron.schedule("45 19 * * *", async () => {
     console.log("--- ĐANG TỔNG HỢP BÁO CÁO NGÀY ---");
-    // ... (Giữ nguyên logic cron cũ của mày)
 }, { timezone: "Asia/Ho_Chi_Minh" });
 
 // ==========================================
-// 5. XỬ LÝ LỖI 404 (PHẢI ĐẶT SAU CÙNG CỦA CÁC ROUTE)
+// 5. XỬ LÝ LỖI 404
 // ==========================================
 app.use((req, res) => {
   console.log("Lỗi 404 tại đường dẫn:", req.originalUrl);
@@ -120,7 +125,7 @@ app.use((req, res) => {
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`==========================================`);
-  console.log(`    SERVER CHẠY TRÊN PORT ${PORT}          `);
-  console.log(`    KẾT NỐI DATABASE THÀNH CÔNG            `);
+  console.log(`   SERVER CHẠY TRÊN PORT ${PORT}          `);
+  console.log(`   KẾT NỐI DATABASE THÀNH CÔNG            `);
   console.log(`==========================================`);
 });
