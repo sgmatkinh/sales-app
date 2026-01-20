@@ -16,11 +16,13 @@ export default function Customers() {
 
   const fileInputRef = useRef(null);
 
-  // Load dữ liệu ban đầu
+  // Load dữ liệu và sắp xếp người mới lên đầu
   const loadAndFixData = async () => {
     try {
       const res = await axios.get("/api/customers");
-      const baseCustomers = res.data;
+      // SẮP XẾP: Đảo ngược mảng để người mới nhất (ID cao nhất) lên đầu
+      const baseCustomers = res.data.reverse(); 
+      
       const fixedCustomers = await Promise.all(
         baseCustomers.map(async (c) => {
           try {
@@ -42,7 +44,9 @@ export default function Customers() {
     setSelectedPhone(customer.phone);
     setSelectedCustomer(customer);
     axios.get(`/api/customers/${customer.phone}/history`).then(res => {
-      setHistory(res.data);
+      // Sắp xếp lịch sử giao dịch: Đơn mới nhất lên trên cùng
+      const sortedHistory = res.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setHistory(sortedHistory);
       const actualTotal = res.data.reduce((sum, inv) => sum + (inv.final_total || 0), 0);
       setSelectedCustomer(prev => ({ ...prev, total_spent: actualTotal }));
     });
@@ -77,19 +81,15 @@ export default function Customers() {
     } catch (err) { alert("Lỗi khi cập nhật!"); }
   };
 
-  // --- XỬ LÝ XÓA (ĐÃ FIX) ---
+  // --- XỬ LÝ XÓA ---
   const handleDeleteCustomer = async (e, customer) => {
     e.stopPropagation(); 
     if (!window.confirm(`Xóa khách hàng ${customer.name || customer.phone}? Toàn bộ lịch sử mua hàng sẽ bị xóa vĩnh viễn!`)) return;
     
     try {
-      // 1. Gửi lệnh xóa lên server
       await axios.delete(`/api/customers/${customer.phone}`);
-      
-      // 2. Xóa nó khỏi danh sách hiển thị ngay lập tức (Quan trọng nhất)
       setCustomers(prev => prev.filter(item => item.phone !== customer.phone));
       
-      // 3. Nếu đang mở thông tin thằng vừa xóa thì dọn sạch màn hình bên phải
       if (selectedPhone === customer.phone) {
         setSelectedPhone(null);
         setSelectedCustomer(null);
@@ -99,7 +99,7 @@ export default function Customers() {
       alert("Đã xóa khách hàng thành công!");
     } catch (err) { 
         console.error("Lỗi xóa:", err);
-        alert("Không thể xóa! Có thể do server chưa phản hồi hoặc khách hàng này có ràng buộc dữ liệu."); 
+        alert("Không thể xóa!"); 
     }
   };
 
@@ -119,6 +119,7 @@ export default function Customers() {
     XLSX.writeFile(wb, "Danh_Sach_Khach_Hang.xlsx");
   };
 
+  // Logic filter và hiển thị
   const filteredCustomers = customers
     .filter(c => c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.phone?.includes(searchTerm))
     .filter(c => filterType === "all" || (filterType === "vip" && c.total_spent > 5000000));
@@ -164,7 +165,7 @@ export default function Customers() {
             <input type="file" ref={fileInputRef} className="hidden" />
           </div>
           <div className="flex gap-2 mb-4">
-            <button onClick={() => setFilterType("all")} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase border ${filterType === 'all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-400 border-slate-100'}`}>Tất cả</button>
+            <button onClick={() => setFilterType("all")} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase border ${filterType === 'all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-400 border-slate-100'}`}>Tất cả ({customers.length})</button>
             <button onClick={() => setFilterType("vip")} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase border ${filterType === 'vip' ? 'bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-100' : 'bg-white text-slate-400 border-slate-100'}`}>Hạng VIP</button>
           </div>
           <div className="relative">
