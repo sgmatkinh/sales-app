@@ -126,7 +126,7 @@ export default function Login({ onLoginSuccess }) {
                 type={showPassword ? "text" : "password"}
                 required
                 className="w-full bg-black/40 border border-white/5 rounded-2xl py-4 pl-12 pr-12 text-white outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-black/60 transition-all font-bold placeholder:text-slate-600"
-                placeholder="Mật khẩu bảo mật"
+                placeholder="Mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -154,7 +154,7 @@ export default function Login({ onLoginSuccess }) {
               ) : isSuccess ? (
                 <span>Truy Cập Thành Công!</span>
               ) : (
-                <span>Vào Hệ Thống</span>
+                <span>Đăng Nhập Hệ Thống</span>
               )}
             </button>
           </form>
@@ -167,7 +167,7 @@ export default function Login({ onLoginSuccess }) {
                   : 'animate-warning-light'
                 }`}></div>
                 <span className={`text-[10px] font-black uppercase tracking-widest italic ${isSuccess ? 'text-green-400' : 'text-slate-400'}`}>
-                  {isSuccess ? "Access Granted" : "Hệ thống đã được bảo vệ"}
+                  {isSuccess ? "Access Granted" : "Hệ Thống Được Bảo Vệ"}
                 </span>
              </div>
           </div>
